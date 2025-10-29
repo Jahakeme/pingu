@@ -116,7 +116,7 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
 
   useEffect(() => {
     // ✅ Connect to your backend socket server
-    const socket: Socket = io("http://localhost:4000", {
+    const socket: Socket = io("https://ping-gilt.vercel.app", {
       transports: ["websocket"], // helps avoid polling issues
     });
     socketRef.current = socket;
