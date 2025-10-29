@@ -91,7 +91,7 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} onSelectUser={onSelectUser} />
+        <NavMain items={navMain} />
         {onSelectUser && people && (
           <NavUsers
             users={people}

@@ -1,20 +1,16 @@
 "use client"
 
 import { type LucideIcon } from "lucide-react"
-import { useSession } from "next-auth/react"
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar"
-import type { SelectedUser } from "@/components/Chatroom"
 
 export function NavMain({
   items,
-  onSelectUser,
 }: {
   items: {
     title: string
@@ -22,10 +18,7 @@ export function NavMain({
     icon?: LucideIcon
     isActive?: boolean
   }[]
-  onSelectUser?: (user: SelectedUser) => void
 }) {
-  const { data: session } = useSession()
-  const { isMobile } = useSidebar()
 
 
   return (

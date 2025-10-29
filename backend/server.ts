@@ -2,7 +2,7 @@
 import express from 'express';
 import { Server } from 'socket.io';
 import http from 'http';
-import prisma from './prisma/connection.ts';
+import prisma from './prisma/connection';
 
 
 interface ClientMessage {
