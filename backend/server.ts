@@ -49,10 +49,15 @@ io.on('connection', (socket) => {
     };
     
     try {
+      if (!data.userId || !data.recipientId) {
+        console.error('Missing userId or recipientId');
+        return;
+      }
+      
       await prisma.message.create({
         data: {
           content: message.text,
-          senderId: message.userId,
+          senderId: data.userId,
           recipientId: data.recipientId,
         },
       });
