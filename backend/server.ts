@@ -26,7 +26,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'https://ping-gilt.vercel.app',
+    origin: 'http://localhost:3000',
     methods: ['GET', 'POST']
   }
 });
@@ -72,7 +72,7 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, () => {
-  console.log(`Server is running on https://ping-gilt.vercel.app:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
 
 server.on('error', (err) => {
