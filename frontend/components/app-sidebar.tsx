@@ -17,6 +17,7 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { SearchForm } from "@/components/search-form"
 import { useSession } from "next-auth/react"
@@ -41,6 +42,7 @@ export function AppSidebar({
   selectedUser?: SelectedUser
 }) {
   const { data: session } = useSession()
+  const { setOpenMobile, isMobile } = useSidebar()
 
   const navMain = [
     {
@@ -50,7 +52,7 @@ export function AppSidebar({
       isActive: false,
     },
     {
-      title: "Groups",
+      title: "Groups (feature coming soon)",
       url: "#people",
       icon: Users,
       isActive: false,
@@ -104,6 +106,10 @@ export function AppSidebar({
                   image: user.image,
                 };
                 onSelectUser(selectedUserObj);
+                // Close sidebar on mobile when user is selected
+                if (isMobile) {
+                  setOpenMobile(false);
+                }
               }
             }}
             selectedUserId={selectedUser?.id}
