@@ -118,7 +118,11 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
     // ✅ Connect to your backend socket server
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
     const socket: Socket = io(backendUrl, {
-      transports: ["websocket"], // helps avoid polling issues
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
     });
     socketRef.current = socket;
 
