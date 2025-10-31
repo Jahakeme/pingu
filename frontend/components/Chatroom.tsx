@@ -55,22 +55,6 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
     }
   };
 
-  const markMessagesAsRead = async () => {
-    if (!selectedUser || !session?.user?.id) return;
-
-    try {
-      await fetch(`/api/messages/mark-as-read`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          senderId: selectedUser.id,
-          recipientId: session.user.id,
-        }),
-      });
-    } catch (error) {
-      console.error("Error marking messages as read:", error);
-    }
-  };
 
   useEffect(() => {
     // Load messages from database
@@ -165,9 +149,6 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
       userName: session?.user?.name || "User",
       recipientId: selectedUser.id,
     });
-    
-    // Mark messages as read when replying
-    markMessagesAsRead();
     
     setMessage("");
   };
