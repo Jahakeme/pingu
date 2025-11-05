@@ -54,19 +54,30 @@ io.on('connection', (socket) => {
         return;
       }
       
-      await prisma.message.create({
+      const savedMessage = await prisma.message.create({
         data: {
           content: message.text,
           senderId: data.userId,
           recipientId: data.recipientId,
         },
       });
+      
+      // Emit message to all clients (for real-time chat)
+      io.emit('message', message);
+      
+      // Emit new unread message event to recipient for unread count updates
+      // Note: Frontend will handle invalidating queries based on the message event
+      // This ensures real-time updates of unread counts
+      io.emit('newUnreadMessage', {
+        recipientId: data.recipientId,
+        messageId: savedMessage.id,
+        senderId: data.userId,
+      });
+      
+      console.log('Message received:', message);
     } catch (error) {
       console.error('Error saving message to database:', error);
     }
-    
-    io.emit('message', message);
-    console.log('Message received:', message);
   });
 
   socket.on('disconnect', () => {
