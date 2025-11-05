@@ -119,7 +119,7 @@ export function UnreadMessagesModal({
               : "No unread messages"}
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-6 space-y-4 overflow-y-auto flex-1 px-2">
+        <div className="mt-6 space-y-4 overflow-y-auto flex-1 p-2">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-muted-foreground">Loading unread messages...</p>
