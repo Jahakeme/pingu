@@ -21,11 +21,23 @@ const Aside = ({ onSelectUser, selectedUser }: AsideProps) => {
     },
   })
 
+  // Fetch unread count
+  const { data: unreadCountData } = useQuery<{ count: number }>({
+    queryKey: ['unreadCount'],
+    queryFn: async () => {
+      const res = await fetch('/api/messages/unread-count')
+      if (!res.ok) return { count: 0 }
+      return res.json()
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+  })
+
   return (
     <AppSidebar
       people={people}
       onSelectUser={onSelectUser}
       selectedUser={selectedUser}
+      unreadCount={unreadCountData?.count}
     />
   )
 }

@@ -20,16 +20,17 @@ enum Gender {
 }
 
 model User {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  email     String    @unique
-  image     String?
-  gender    Gender
-  password  String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  messages  Message[]
-  Profile   Profile[]
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String        @unique
+  image        String?
+  gender       Gender
+  password     String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  messages     Message[]
+  Profile      Profile[]
+  readMessages ReadMessage[]
 }
 
 model Profile {
@@ -42,10 +43,23 @@ model Profile {
 }
 
 model Message {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
   content     String
-  senderId    String   @db.ObjectId
-  sender      User     @relation(fields: [senderId], references: [id])
-  recipientId String?  @db.ObjectId
-  createdAt   DateTime @default(now())
+  senderId    String        @db.ObjectId
+  sender      User          @relation(fields: [senderId], references: [id])
+  recipientId String?       @db.ObjectId
+  createdAt   DateTime      @default(now())
+  readBy      ReadMessage[]
+}
+
+model ReadMessage {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  messageId String   @db.ObjectId
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  readAt    DateTime @default(now())
+
+  @@unique([messageId, userId])
+  @@index([userId, messageId])
 }

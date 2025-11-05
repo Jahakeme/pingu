@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import io, { Socket } from "socket.io-client";
 import { Send } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Message = {
   text: string;
@@ -36,6 +37,7 @@ export interface ChatroomProps {
 
 const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const socketRef = useRef<Socket | null>(null);
@@ -95,7 +97,29 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
       }
     };
 
+    // Mark messages as read when conversation is opened
+    const markMessagesAsRead = async () => {
+      if (!selectedUser || !session?.user?.id) {
+        return;
+      }
+
+      try {
+        await fetch("/api/messages/mark-read", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            conversationUserId: selectedUser.id,
+          }),
+        });
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+      }
+    };
+
     loadMessages();
+    markMessagesAsRead();
   }, [session?.user?.id, selectedUser]);
 
   useEffect(() => {
@@ -119,7 +143,12 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
         (serverMessage.userId === currentUserId && serverMessage.recipientId === selectedUser?.id) ||
         (serverMessage.userId === selectedUser?.id && serverMessage.recipientId === currentUserId);
       
-      if (!isRelevantMessage) return;
+      if (!isRelevantMessage) {
+        // Message is for another conversation - invalidate unread counts
+        queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+        queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
+        return;
+      }
       
       const message: Message = {
         text: serverMessage.text,
@@ -129,12 +158,26 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
         timestamp: serverMessage.timestamp,
       };
       setMessages((prevMessages) => [...prevMessages, message]);
+      
+      // Invalidate unread counts when new message arrives in current conversation
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
+    });
+
+    // Listen for new unread message events to update counts
+    socket.on("newUnreadMessage", (data: { recipientId: string }) => {
+      const currentUserId = session?.user?.id;
+      // Only invalidate if this message is for the current user
+      if (data.recipientId === currentUserId) {
+        queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+        queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
+      }
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [selectedUser, session?.user?.id]);
+  }, [selectedUser, session?.user?.id, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

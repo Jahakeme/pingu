@@ -10,6 +10,7 @@ import Image from "next/image"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { NavUsers } from "@/components/nav-users"
+import { UnreadMessagesModal } from "@/components/unread-messages-modal"
 import {
   Sidebar,
   SidebarContent,
@@ -35,14 +36,17 @@ export function AppSidebar({
   people,
   onSelectUser,
   selectedUser,
+  unreadCount,
   ...props 
 }: React.ComponentProps<typeof Sidebar> & {
   people?: Info[]
   onSelectUser?: (user: SelectedUser) => void
   selectedUser?: SelectedUser
+  unreadCount?: number
 }) {
   const { data: session } = useSession()
   const { setOpenMobile, isMobile } = useSidebar()
+  const [isUnreadModalOpen, setIsUnreadModalOpen] = React.useState(false)
 
   const navMain = [
     {
@@ -93,7 +97,11 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain 
+          items={navMain} 
+          unreadCount={unreadCount}
+          onInboxClick={() => setIsUnreadModalOpen(true)}
+        />
         {onSelectUser && people && (
           <NavUsers
             users={people}
@@ -120,6 +128,11 @@ export function AppSidebar({
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
+      <UnreadMessagesModal
+        open={isUnreadModalOpen}
+        onOpenChange={setIsUnreadModalOpen}
+        onSelectUser={onSelectUser}
+      />
     </Sidebar>
   )
 }
