@@ -32,7 +32,7 @@ const Navbar = () => {
           size="sm"
           className="text-xs md:text-sm px-3 md:px-4"
           onClick={() => {
-            router.push("/api/signup");
+            router.push("/signup");
           }}
         >
           Care to join?
