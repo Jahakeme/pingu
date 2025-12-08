@@ -14,7 +14,7 @@ declare module "next-auth" {
       image: string;
     };
   }
-    }
+}
 
 export const authOptions:NextAuthOptions = {
   // Configure one or more authentication providers
@@ -26,7 +26,6 @@ export const authOptions:NextAuthOptions = {
       password: { label: "Password", type: "password" }
     },
     async authorize(credentials) {
-        console.log("Credentials:", credentials); // Remove before deploying to production
          const user = await prisma.user.findFirst({where:{email:credentials?.username}})
             if (!user) {
                 throw new Error("No user found with the given email")

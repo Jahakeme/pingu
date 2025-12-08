@@ -115,6 +115,7 @@ const Signin = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              {/* Google Button */}
               <Button
                 type="button"
                 variant="outline"
@@ -130,6 +131,8 @@ const Signin = () => {
                 />
                 <span className="hidden sm:inline">Google</span>
               </Button>
+
+              {/* GitHub Button */}
               <Button
                 type="button"
                 variant="outline"
