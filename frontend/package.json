@@ -24,13 +24,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.546.0",
-<<<<<<< HEAD
     "next": "^16.2.6",
     "next-auth": "^4.24.14",
-=======
-    "next": "15.5.9",
-    "next-auth": "^4.24.11",
->>>>>>> a352dde5c709430ea8d6c0b796c9f83dfb0958af
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "socket.io-client": "^4.8.1",
