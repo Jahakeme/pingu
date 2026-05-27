@@ -1,10 +1,5 @@
 import Navbar from './Navbar'
-import { Bitcount_Grid_Single } from "next/font/google";
-
-const bitcount = Bitcount_Grid_Single({
-  subsets: ["latin"],
-  weight: ["300","400"],
-});
+import { bitcount } from '@/lib/fonts'
 
 const Landing = () => {
   return (

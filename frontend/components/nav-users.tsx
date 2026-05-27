@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import {
   Avatar,
   AvatarFallback,
@@ -13,7 +14,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-export function NavUsers({
+function NavUsersImpl({
   users,
   onSelectUser,
   selectedUserId,
@@ -53,3 +54,5 @@ export function NavUsers({
     </SidebarGroup>
   )
 }
+
+export const NavUsers = React.memo(NavUsersImpl)
