@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse} from "next/server";    
+import { NextRequest, NextResponse} from "next/server";
 import prisma from "@/prisma/connection";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // Create message
 export async function POST(req:NextRequest) {
@@ -35,19 +37,42 @@ export async function PUT(req:NextRequest) {
     }   
 }
 
-// Get all messages
-export async function GET() {
-    try {   
-        const allMessages = await prisma.message.findMany({
+// Get messages for current conversation
+export async function GET(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        const currentUserId = session?.user?.id;
+        if (!currentUserId) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
+        const otherUserId = req.nextUrl.searchParams.get("userId");
+
+        const where = otherUserId
+            ? {
+                OR: [
+                    { senderId: currentUserId, recipientId: otherUserId },
+                    { senderId: otherUserId, recipientId: currentUserId },
+                ],
+            }
+            : {
+                OR: [
+                    { senderId: currentUserId },
+                    { recipientId: currentUserId },
+                ],
+            };
+
+        const messages = await prisma.message.findMany({
+            where,
             orderBy: { createdAt: 'asc' },
         })
-        return NextResponse.json(allMessages, {status: 200})
+        return NextResponse.json(messages, {status: 200})
     } catch (_error) {
         return NextResponse.json(
             {message:"Something went wrong"},
             {status: 501}
         )
-    }   
+    }
 }
 
 // Delete message
