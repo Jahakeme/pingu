@@ -1,10 +1,7 @@
 "use client"
 
 import * as React from "react"
-import {
-  Inbox,
-  Users,
-} from "lucide-react"
+import { Inbox, Users } from "lucide-react"
 import Image from "next/image"
 
 import { NavMain } from "@/components/nav-main"
@@ -32,12 +29,19 @@ interface Info {
 
 import type { SelectedUser } from '@/components/Chatroom';
 
-export function AppSidebar({ 
+const NAV_MAIN = [
+  { title: "Inbox", url: "#", icon: Inbox, isActive: false },
+  { title: "Groups (feature coming soon)", url: "#people", icon: Users, isActive: false },
+]
+
+const GUEST_USER = { name: "Guest", email: "guest@example.com" } as const
+
+export function AppSidebar({
   people,
   onSelectUser,
   selectedUser,
   unreadCount,
-  ...props 
+  ...props
 }: React.ComponentProps<typeof Sidebar> & {
   people?: Info[]
   onSelectUser?: (user: SelectedUser) => void
@@ -48,32 +52,26 @@ export function AppSidebar({
   const { setOpenMobile, isMobile } = useSidebar()
   const [isUnreadModalOpen, setIsUnreadModalOpen] = React.useState(false)
 
-  const navMain = [
-    {
-      title: "Inbox",
-      url: "#",
-      icon: Inbox,
-      isActive: false,
-    },
-    {
-      title: "Groups (feature coming soon)",
-      url: "#people",
-      icon: Users,
-      isActive: false,
-    },
-  ]
+  const handleInboxClick = React.useCallback(() => setIsUnreadModalOpen(true), [])
 
+  const handleUserSelect = React.useCallback(
+    (userId: string) => {
+      if (!people || !onSelectUser) return
+      const u = people.find((p) => p.id === userId)
+      if (!u) return
+      onSelectUser({ id: u.id, name: u.name || "User", image: u.image })
+      if (isMobile) setOpenMobile(false)
+    },
+    [people, onSelectUser, isMobile, setOpenMobile]
+  )
 
-  const user = session?.user 
+  const user = session?.user
     ? {
         name: session.user.name || "User",
         email: session.user.email || "",
         avatar: session.user.image || undefined,
       }
-    : {
-        name: "Guest",
-        email: "guest@example.com",
-      }
+    : GUEST_USER
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -97,29 +95,15 @@ export function AppSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain 
-          items={navMain} 
+        <NavMain
+          items={NAV_MAIN}
           unreadCount={unreadCount}
-          onInboxClick={() => setIsUnreadModalOpen(true)}
+          onInboxClick={handleInboxClick}
         />
         {onSelectUser && people && (
           <NavUsers
             users={people}
-            onSelectUser={(userId) => {
-              const user = people.find(u => u.id === userId);
-              if (user) {
-                const selectedUserObj: SelectedUser = {
-                  id: user.id,
-                  name: user.name || "User",
-                  image: user.image,
-                };
-                onSelectUser(selectedUserObj);
-                // Close sidebar on mobile when user is selected
-                if (isMobile) {
-                  setOpenMobile(false);
-                }
-              }
-            }}
+            onSelectUser={handleUserSelect}
             selectedUserId={selectedUser?.id}
           />
         )}
