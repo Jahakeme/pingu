@@ -1,11 +1,11 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import io, { Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 import { Send } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type Message = {
   text: string;
@@ -24,6 +24,13 @@ type ServerMessage = {
   recipientId?: string;
 };
 
+type DbMessage = {
+  content: string;
+  senderId: string;
+  recipientId?: string;
+  createdAt: string;
+};
+
 export interface SelectedUser {
   id: string;
   name: string;
@@ -35,184 +42,177 @@ export interface ChatroomProps {
   onSelectUser?: (user: SelectedUser) => void;
 }
 
+const TIME_FMT = new Intl.DateTimeFormat("en-US", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const formatTime = (timestamp: string | undefined): string => {
+  if (!timestamp) return "";
+  try {
+    return TIME_FMT.format(new Date(timestamp));
+  } catch {
+    return "";
+  }
+};
+
 const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const currentUserId = session?.user?.id;
+  const selectedUserId = selectedUser?.id;
+
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const socketRef = useRef<Socket | null>(null);
+  const [liveMessages, setLiveMessages] = useState<Message[]>([]);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const formatTime = (timestamp: string | undefined): string => {
-    if (!timestamp) return "";
-    try {
-      const date = new Date(timestamp);
-      return date.toLocaleString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
+  // Load historical messages via TanStack Query (deduped, cached)
+  const { data: history } = useQuery<Message[]>({
+    queryKey: ["messages", currentUserId, selectedUserId],
+    enabled: Boolean(currentUserId && selectedUserId),
+    queryFn: async () => {
+      const res = await fetch(`/api/messages?userId=${selectedUserId}`);
+      if (!res.ok) return [];
+      const dbMessages: DbMessage[] = await res.json();
+      return dbMessages.map((m) => ({
+        text: m.content,
+        isUser: currentUserId === m.senderId,
+        userId: m.senderId,
+        timestamp: m.createdAt,
+      }));
+    },
+  });
+
+  // Reset live messages and mark-as-read in parallel when conversation changes
+  useEffect(() => {
+    setLiveMessages([]);
+    if (!selectedUserId || !currentUserId) return;
+
+    void fetch("/api/messages/mark-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversationUserId: selectedUserId }),
+    }).catch((err) => console.error("Error marking messages as read:", err));
+  }, [currentUserId, selectedUserId]);
+
+  // Socket lifecycle — connect once per mount, lazy-load module
+  useEffect(() => {
+    let cancelled = false;
+    let created: Socket | null = null;
+
+    (async () => {
+      const { io } = await import("socket.io-client");
+      if (cancelled) return;
+      const backendUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
+      created = io(backendUrl, {
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5,
       });
-    } catch {
-      return "";
-    }
-  };
+      setSocket(created);
+    })();
 
-
-  useEffect(() => {
-    // Load messages from database
-    const loadMessages = async () => {
-      if (!selectedUser) {
-        setMessages([]);
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/messages");
-        if (response.ok) {
-          const dbMessages = await response.json();
-          // Filter messages for the selected conversation
-          const conversationMessages: Message[] = dbMessages
-            .filter((msg: { senderId: string; recipientId?: string }) => {
-              const currentUserId = session?.user?.id;
-              const selectedUserId = selectedUser.id;
-              
-              // Show messages where:
-              // 1. Current user sent to selected user
-              // 2. Selected user sent to current user
-              return (
-                (msg.senderId === currentUserId && msg.recipientId === selectedUserId) ||
-                (msg.senderId === selectedUserId && msg.recipientId === currentUserId)
-              );
-            })
-            .map((msg: { content: string; senderId: string; createdAt: string }) => ({
-              text: msg.content,
-              isUser: session?.user?.id === msg.senderId,
-              userId: msg.senderId,
-              timestamp: msg.createdAt,
-            }));
-          setMessages(conversationMessages);
-        }
-      } catch (error) {
-        console.error("Error loading messages:", error);
-      }
+    return () => {
+      cancelled = true;
+      created?.disconnect();
+      setSocket(null);
     };
+  }, []);
 
-    // Mark messages as read when conversation is opened
-    const markMessagesAsRead = async () => {
-      if (!selectedUser || !session?.user?.id) {
-        return;
-      }
-
-      try {
-        await fetch("/api/messages/mark-read", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            conversationUserId: selectedUser.id,
-          }),
-        });
-      } catch (error) {
-        console.error("Error marking messages as read:", error);
-      }
-    };
-
-    loadMessages();
-    markMessagesAsRead();
-  }, [session?.user?.id, selectedUser]);
-
+  // Attach listeners keyed by conversation
   useEffect(() => {
-    // ✅ Connect to your backend socket server
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:4000";
-    const socket: Socket = io(backendUrl, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-    });
-    socketRef.current = socket;
+    if (!socket) return;
 
-    socket.on("message", (serverMessage: ServerMessage) => {
+    const handleMessage = (serverMessage: ServerMessage) => {
       const isCurrentUser = socket.id === serverMessage.socketId;
-      const currentUserId = session?.user?.id;
-      
-      // Only add message if it's part of the current conversation
-      const isRelevantMessage = 
-        (serverMessage.userId === currentUserId && serverMessage.recipientId === selectedUser?.id) ||
-        (serverMessage.userId === selectedUser?.id && serverMessage.recipientId === currentUserId);
-      
-      if (!isRelevantMessage) {
-        // Message is for another conversation - invalidate unread counts
+      const isRelevant =
+        (serverMessage.userId === currentUserId &&
+          serverMessage.recipientId === selectedUserId) ||
+        (serverMessage.userId === selectedUserId &&
+          serverMessage.recipientId === currentUserId);
+
+      if (!isRelevant) {
         queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
         queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
         return;
       }
-      
-      const message: Message = {
-        text: serverMessage.text,
-        isUser: isCurrentUser,
-        userName: serverMessage.userName,
-        userId: serverMessage.userId,
-        timestamp: serverMessage.timestamp,
-      };
-      setMessages((prevMessages) => [...prevMessages, message]);
-      
-      // Invalidate unread counts when new message arrives in current conversation
+
+      setLiveMessages((prev) => [
+        ...prev,
+        {
+          text: serverMessage.text,
+          isUser: isCurrentUser,
+          userName: serverMessage.userName,
+          userId: serverMessage.userId,
+          timestamp: serverMessage.timestamp,
+        },
+      ]);
+
       queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
       queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
-    });
+    };
 
-    // Listen for new unread message events to update counts
-    socket.on("newUnreadMessage", (data: { recipientId: string }) => {
-      const currentUserId = session?.user?.id;
-      // Only invalidate if this message is for the current user
+    const handleNewUnread = (data: { recipientId: string }) => {
       if (data.recipientId === currentUserId) {
         queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
         queryClient.invalidateQueries({ queryKey: ["unreadMessages"] });
       }
-    });
+    };
+
+    socket.on("message", handleMessage);
+    socket.on("newUnreadMessage", handleNewUnread);
 
     return () => {
-      socket.disconnect();
+      socket.off("message", handleMessage);
+      socket.off("newUnreadMessage", handleNewUnread);
     };
-  }, [selectedUser, session?.user?.id, queryClient]);
+  }, [socket, currentUserId, selectedUserId, queryClient]);
+
+  const messages = useMemo(
+    () => [...(history ?? []), ...liveMessages],
+    [history, liveMessages]
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!message.trim() || !socketRef.current || !selectedUser) return;
-    
-    socketRef.current.emit("chatMessage", {
-      text: message,
-      userId: session?.user?.id || "Anonymous",
-      userName: session?.user?.name || "User",
-      recipientId: selectedUser.id,
-    });
-    
-    setMessage("");
-  };
+  const handleSendMessage = useCallback(() => {
+    if (!message.trim() || !socket || !selectedUserId) return;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
+    socket.emit("chatMessage", {
+      text: message,
+      userId: currentUserId || "Anonymous",
+      userName: session?.user?.name || "User",
+      recipientId: selectedUserId,
+    });
+
+    setMessage("");
+  }, [message, socket, currentUserId, selectedUserId, session?.user?.name]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
   return (
     <div className="flex h-full flex-col">
-      {/* Conversation Header */}
       {selectedUser && (
         <div className="border-b p-4 bg-muted/50">
           <h2 className="text-lg font-semibold">{selectedUser.name || "User"}</h2>
         </div>
       )}
 
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {!selectedUser ? (
           <div className="flex h-full items-center justify-center">
@@ -260,7 +260,6 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
       {selectedUser && (
         <div className="border-t p-4">
           <div className="mx-auto max-w-3xl">
@@ -271,7 +270,7 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  className="pr-12 min-h-[52px] resize-none"
+                  className="pr-12 min-h-13 resize-none"
                 />
                 <Button
                   size="icon"
@@ -291,4 +290,3 @@ const Chatroom: React.FC<ChatroomProps> = ({ selectedUser }) => {
 }
 
 export default Chatroom;
-
